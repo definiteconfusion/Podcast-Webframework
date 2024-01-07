@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Microphone Audio Detection</title>
+</head>
+<body>
+    <h1 id="status">Waiting for sound...</h1>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+    <script>
+        var socket = io.connect('127.0.0.1:5000'); // Replace with your server IP and port
+        
+        socket.on('connect', function() {
+            console.log('Connected to the server');
+            
+            // Get user media
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function(stream) {
+                    const audioContext = new AudioContext();
+                    const mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                    const analyser = audioContext.createAnalyser();
+                    mediaStreamSource.connect(analyser);
+                    
+                    analyser.fftSize = 32;
+                    const bufferLength = analyser.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+                    
+                    function checkAudioLevel() {
+                        requestAnimationFrame(checkAudioLevel);
+                        analyser.getByteFrequencyData(dataArray);
+                        
+                        let maxVolume = Math.max(...dataArray);
+                        let volumeLevel = maxVolume / 255 * 100; // Convert to percentage
+                        
+                        if (volumeLevel > 53.7) { // Approximately 35 dB
+                            socket.emit('sound_detected', { status: true });
+                            console.log("Sound Detected");
+                        }
+                    }
+                    
+                    checkAudioLevel();
+                })
+                .catch(function(err) {
+                    console.error('Error accessing microphone:', err);
+                });
+        });
+    </script>
+</body>
+</html>
